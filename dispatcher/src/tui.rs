@@ -409,7 +409,7 @@ impl App {
             return;
         }
 
-        let mut args = match self.selected_tool().arguments() {
+        let args = match self.selected_tool().arguments() {
             Ok(args) => args,
             Err(error) => {
                 self.status = format!("Invalid parameters: {error}");
@@ -419,9 +419,6 @@ impl App {
         let graceful = args.first().is_some_and(|arg| arg == "file-transfer")
             && args.get(1).is_some_and(|arg| arg == "server");
         let display = format_command(&args);
-        if graceful {
-            args.push("--control-stdin".to_string());
-        }
         let executable = match std::env::current_exe() {
             Ok(path) => path,
             Err(error) => {
@@ -431,6 +428,9 @@ impl App {
         };
 
         let mut command = Command::new(executable);
+        if graceful {
+            command.env("UT_FILE_TRANSFER_CONTROL_STDIN", "1");
+        }
         command
             .args(&args)
             .stdin(if graceful {

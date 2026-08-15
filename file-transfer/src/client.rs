@@ -1102,7 +1102,6 @@ mod tests {
             auth: true,
             token_file: Some(token_path),
             max_connections: 2,
-            control_stdin: false,
             idle_timeout: 5,
         }));
 

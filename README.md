@@ -90,6 +90,31 @@ ut file-hash
 
 Run `ut <tool> --help` for each tool's options.
 
+## Shell tab completion
+
+Automatically detect the current shell and install an idempotent startup hook:
+
+```bash
+ut completions install
+```
+
+Override detection when needed:
+
+```bash
+ut completions install --shell zsh
+```
+
+The installer supports Bash, Zsh, Fish, and PowerShell. It updates the corresponding user profile with a clearly marked managed block and regenerates completion code from the current `ut` command definition on every shell startup, so newly added commands and options appear automatically. Restart the shell or source the profile after installation.
+
+Completion scripts can also be printed without modifying a profile:
+
+```bash
+ut completions bash
+ut completions zsh
+ut completions fish
+ut completions powershell
+```
+
 ## Build and test
 
 ```bash

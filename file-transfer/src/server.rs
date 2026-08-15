@@ -48,10 +48,6 @@ pub struct ServerArgs {
     #[arg(long, default_value_t = 8)]
     pub max_connections: usize,
 
-    /// Accept a `shutdown` command on stdin (used by the parent TUI)
-    #[arg(long, hide = true)]
-    pub control_stdin: bool,
-
     /// Disconnect clients that send no protocol data for this many seconds
     #[arg(long, default_value_t = 60)]
     pub idle_timeout: u64,
@@ -280,6 +276,7 @@ impl HashCache {
 }
 
 pub async fn run(args: ServerArgs) -> io::Result<()> {
+    let control_stdin = std::env::var_os("UT_FILE_TRANSFER_CONTROL_STDIN").is_some();
     let root = args.dir.canonicalize()?;
     if !root.is_dir() {
         return Err(io::Error::new(
@@ -350,7 +347,7 @@ pub async fn run(args: ServerArgs) -> io::Result<()> {
                 eprintln!("[server] graceful shutdown requested");
                 break;
             }
-            _ = control_shutdown(args.control_stdin), if args.control_stdin => {
+            _ = control_shutdown(control_stdin), if control_stdin => {
                 eprintln!("[server] graceful shutdown requested by parent TUI");
                 break;
             }

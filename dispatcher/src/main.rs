@@ -1,5 +1,6 @@
 use clap::{Parser, Subcommand};
 
+mod completions;
 mod tui;
 
 /// Unified entry for useful tools
@@ -12,6 +13,9 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Commands {
+    /// Generate or install shell tab completions
+    Completions(completions::Args),
+
     /// Batch generate UUIDs
     #[command(name = "uuid-gen")]
     UuidGen(uuid_gen::Args),
@@ -36,6 +40,12 @@ enum Commands {
 #[tokio::main]
 async fn main() {
     match Cli::parse().command {
+        Some(Commands::Completions(args)) => {
+            if let Err(error) = completions::run(args) {
+                eprintln!("ut completions: {error}");
+                std::process::exit(1);
+            }
+        }
         Some(Commands::UuidGen(args)) => uuid_gen::run(args),
         Some(Commands::FileServer(args)) => file_server::run(args).await,
         Some(Commands::HttpEcho(args)) => http_echo::run(args).await,
