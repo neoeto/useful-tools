@@ -26,7 +26,11 @@ pub fn resolve_server_path(root: &Path, relative: &str) -> io::Result<PathBuf> {
 }
 
 pub fn safe_local_path(root: &Path, relative: &str) -> io::Result<PathBuf> {
-    let relative = validate_relative(relative)?;
+    // Keep the original UTF-8 protocol path for stable cross-platform hashes.
+    // `validate_relative` returns a `&Path`, which does not expose `as_bytes()`
+    // on Windows.
+    let protocol_path = relative;
+    let relative = validate_relative(protocol_path)?;
     let mut target = root.to_path_buf();
     for component in relative.components() {
         let Component::Normal(value) = component else {
@@ -45,7 +49,7 @@ pub fn safe_local_path(root: &Path, relative: &str) -> io::Result<PathBuf> {
     }
     #[cfg(windows)]
     if target.to_string_lossy().encode_utf16().count() > 240 {
-        let hash = &blake3::hash(relative.as_bytes()).to_hex()[..16];
+        let hash = &blake3::hash(protocol_path.as_bytes()).to_hex()[..16];
         let name = target
             .file_name()
             .and_then(|name| name.to_str())
