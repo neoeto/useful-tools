@@ -1,0 +1,15 @@
+[package]
+name = "file-hash"
+version = "0.1.0"
+edition = "2021"
+description = "Compute file hashes (MD5, SHA-1, SHA-2, SHA-3, BLAKE2, BLAKE3)"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+digest = { version = "0.10", features = ["std"] }
+md-5 = "0.10"
+sha1 = "0.10"
+sha2 = "0.10"
+sha3 = "0.10"
+blake2 = "0.10"
+blake3 = "1"

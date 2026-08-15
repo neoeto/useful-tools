@@ -1,0 +1,21 @@
+[package]
+name = "dispatcher"
+version = "0.2.0"
+edition = "2021"
+description = "Unified CLI entry for useful tools"
+
+[[bin]]
+name = "ut"
+path = "src/main.rs"
+
+[dependencies]
+uuid-gen = { path = "../uuid-gen" }
+file-server = { path = "../file-server" }
+http-echo = { path = "../http-echo" }
+file-hash = { path = "../file-hash" }
+file-transfer = { path = "../file-transfer" }
+clap = { version = "4", features = ["derive"] }
+tokio = { version = "1", features = ["full"] }
+ratatui = "0.29"
+crossterm = "0.28"
+shell-words = "1.1"

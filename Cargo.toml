@@ -1,0 +1,10 @@
+[workspace]
+members = [
+    "file-server",
+    "uuid-gen",
+    "dispatcher",
+    "http-echo",
+    "file-hash",
+    "file-transfer",
+]
+resolver = "2"
