@@ -5,6 +5,7 @@ use crate::{
         PROTOCOL_MAJOR, PROTOCOL_MINOR,
     },
 };
+use chrono::{DateTime, Local};
 use clap::Args as ClapArgs;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -15,7 +16,7 @@ use std::{
     net::{IpAddr, SocketAddr, UdpSocket},
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
-    time::{Duration, Instant, UNIX_EPOCH},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 use tokio::{
     fs,
@@ -24,7 +25,12 @@ use tokio::{
     sync::{watch, Semaphore},
     task::JoinSet,
 };
+use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 use uuid::Uuid;
+
+const SERVER_FILENAME_WIDTH: usize = 32;
+const MARQUEE_PAUSE: Duration = Duration::from_millis(700);
+const MARQUEE_STEP: Duration = Duration::from_millis(160);
 
 #[derive(ClapArgs, Debug, Clone)]
 pub struct ServerArgs {
@@ -65,6 +71,7 @@ struct ServerState {
 #[derive(Clone)]
 struct TransferHub {
     inner: Arc<Mutex<HashMap<Uuid, TransferStatus>>>,
+    interactive: bool,
 }
 
 #[derive(Clone)]
@@ -75,6 +82,8 @@ struct TransferStatus {
     sent: u64,
     total: u64,
     started: Instant,
+    result: Option<String>,
+    finished_at: Option<Instant>,
 }
 
 struct ActiveTransfer {
@@ -103,9 +112,10 @@ impl Drop for ActiveTransfer {
 }
 
 impl TransferHub {
-    fn new() -> Self {
+    fn new(interactive: bool) -> Self {
         Self {
             inner: Arc::new(Mutex::new(HashMap::new())),
+            interactive,
         }
     }
 
@@ -118,6 +128,8 @@ impl TransferHub {
             sent: offset,
             total,
             started: Instant::now(),
+            result: None,
+            finished_at: None,
         };
         self.inner
             .lock()
@@ -138,51 +150,220 @@ impl TransferHub {
     }
 
     fn finish(&self, id: Uuid, result: &str) {
-        if let Some(state) = self.inner.lock().expect("transfer status lock").remove(&id) {
-            eprintln!(
-                "[server] {} | {} | {} / {} | {}",
+        let completed = {
+            let mut states = self.inner.lock().expect("transfer status lock");
+            let Some(state) = states.get_mut(&id) else {
+                return;
+            };
+            if state.result.is_some() {
+                return;
+            }
+            state.result = Some(result.to_string());
+            state.finished_at = Some(Instant::now());
+            Some((
                 state.peer,
-                state.path,
-                format_bytes(state.sent),
-                format_bytes(state.total),
-                result
-            );
+                state.path.clone(),
+                state.sent,
+                state.total,
+                result.to_string(),
+            ))
+        };
+        if !self.interactive {
+            if let Some((peer, path, sent, total, result)) = completed {
+                eprintln!(
+                    "[server] {peer} | {} | {} / {} | {result}",
+                    sanitize_display_text(&path),
+                    format_bytes(sent),
+                    format_bytes(total),
+                );
+            }
         }
     }
 
     async fn display(self, mut shutdown: watch::Receiver<bool>) {
-        let interactive = io::stderr().is_terminal();
+        const FINISHED_DISPLAY: Duration = Duration::from_secs(3);
+        let interactive = self.interactive;
         let mut interval = tokio::time::interval(Duration::from_secs(1));
+        let mut rendered_lines = 0usize;
         loop {
             tokio::select! {
                 _ = interval.tick() => {
-                    let states = self.inner.lock().expect("transfer status lock").values().cloned().collect::<Vec<_>>();
-                    for state in states {
-                        let elapsed = state.started.elapsed().as_secs_f64().max(0.001);
-                        let rate = state.sent.saturating_sub(state.offset) as f64 / elapsed;
-                        let line = format!(
-                            "[server] {} | {} | {} / {} | {}/s | sending",
-                            state.peer,
-                            state.path,
-                            format_bytes(state.sent),
-                            format_bytes(state.total),
-                            format_bytes(rate as u64),
-                        );
-                        if interactive {
-                            eprintln!("\r\x1b[2K{line}");
-                        } else {
-                            eprintln!("{line}");
-                        }
+                    let now = Instant::now();
+                    let mut states = {
+                        let mut states = self.inner.lock().expect("transfer status lock");
+                        states.retain(|_, state| {
+                            state.finished_at.is_none_or(|finished| {
+                                now.duration_since(finished) < FINISHED_DISPLAY
+                            })
+                        });
+                        states
+                            .iter()
+                            .map(|(id, state)| (*id, state.clone()))
+                            .collect::<Vec<_>>()
+                    };
+                    states.sort_by_key(|(id, _)| *id.as_bytes());
+                    if interactive {
+                        rendered_lines = render_dashboard(&states, rendered_lines);
                     }
                 }
                 changed = shutdown.changed() => {
                     if changed.is_err() || *shutdown.borrow() {
+                        if interactive {
+                            let _ = render_dashboard(&[], rendered_lines);
+                        }
                         break;
                     }
                 }
             }
         }
     }
+}
+
+fn render_dashboard(states: &[(Uuid, TransferStatus)], previous_lines: usize) -> usize {
+    let slots = previous_lines.max(states.len());
+    if slots == 0 {
+        return 0;
+    }
+
+    let mut stderr = io::stderr();
+    let now = Instant::now();
+    if previous_lines > 0 {
+        let _ = write!(stderr, "\x1b[{}A", previous_lines);
+    }
+    for index in 0..slots {
+        let _ = write!(stderr, "\r\x1b[2K");
+        if let Some((_, state)) = states.get(index) {
+            let elapsed = now
+                .checked_duration_since(state.started)
+                .unwrap_or_default();
+            if let Some(result) = state.result.as_deref() {
+                let _ = write!(
+                    stderr,
+                    "[server] {} | {} | {} / {} | {}",
+                    state.peer,
+                    fit_server_filename(&state.path, None),
+                    format_bytes(state.sent),
+                    format_bytes(state.total),
+                    result,
+                );
+            } else {
+                let elapsed_seconds = elapsed.as_secs_f64().max(0.001);
+                let rate = state.sent.saturating_sub(state.offset) as f64 / elapsed_seconds;
+                let _ = write!(
+                    stderr,
+                    "[server] {} | {} | {} / {} | {}/s | {} | sending",
+                    state.peer,
+                    fit_server_filename(&state.path, Some(elapsed)),
+                    format_bytes(state.sent),
+                    format_bytes(state.total),
+                    format_bytes(rate as u64),
+                    format_completion_time(estimate_completion(state, elapsed)),
+                );
+            }
+        }
+        let _ = writeln!(stderr);
+    }
+    let _ = stderr.flush();
+    if states.is_empty() {
+        0
+    } else {
+        slots
+    }
+}
+
+fn estimate_completion(state: &TransferStatus, elapsed: Duration) -> Option<SystemTime> {
+    let transferred = state.sent.saturating_sub(state.offset);
+    let remaining = state.total.saturating_sub(state.sent);
+    if state.result.is_some() || transferred == 0 || remaining == 0 {
+        return None;
+    }
+    let seconds = elapsed.as_secs_f64();
+    if seconds <= 0.0 {
+        return None;
+    }
+    let rate = (transferred as f64 / seconds).round() as u64;
+    if rate == 0 {
+        return None;
+    }
+    let remaining_seconds = remaining.saturating_add(rate.saturating_sub(1)) / rate;
+    SystemTime::now().checked_add(Duration::from_secs(remaining_seconds))
+}
+
+fn format_completion_time(completion_at: Option<SystemTime>) -> String {
+    completion_at
+        .map(DateTime::<Local>::from)
+        .map(|timestamp| format!("ETA {}", timestamp.format("%H:%M:%S")))
+        .unwrap_or_else(|| "ETA --:--:--".to_string())
+}
+
+fn fit_server_filename(path: &str, elapsed: Option<Duration>) -> String {
+    let value = sanitize_display_text(path);
+    let name = match elapsed {
+        Some(elapsed) => scrolling_name(&value, SERVER_FILENAME_WIDTH, elapsed),
+        None => truncate_name(&value, SERVER_FILENAME_WIDTH),
+    };
+    let used = UnicodeWidthStr::width(name.as_str());
+    if used >= SERVER_FILENAME_WIDTH {
+        return name;
+    }
+    format!("{name}{}", " ".repeat(SERVER_FILENAME_WIDTH - used))
+}
+
+fn sanitize_display_text(text: &str) -> String {
+    text.chars()
+        .map(|character| {
+            if character.is_control() {
+                '�'
+            } else {
+                character
+            }
+        })
+        .collect()
+}
+
+fn truncate_name(name: &str, width: usize) -> String {
+    if UnicodeWidthStr::width(name) <= width {
+        return name.to_string();
+    }
+    if width == 0 {
+        return String::new();
+    }
+    let content_width = width.saturating_sub(1);
+    let mut used = 0;
+    let mut output = String::new();
+    for character in name.chars() {
+        let character_width = character.width().unwrap_or(0);
+        if used + character_width > content_width {
+            break;
+        }
+        output.push(character);
+        used += character_width;
+    }
+    output.push('…');
+    output
+}
+
+fn scrolling_name(name: &str, width: usize, elapsed: Duration) -> String {
+    if UnicodeWidthStr::width(name) <= width || elapsed < MARQUEE_PAUSE {
+        return truncate_name(name, width);
+    }
+    let characters = format!("{name}   ").chars().collect::<Vec<_>>();
+    let offset = ((elapsed - MARQUEE_PAUSE).as_millis() / MARQUEE_STEP.as_millis()) as usize
+        % characters.len();
+    let mut output = String::new();
+    let mut used = 0;
+    for character in characters.iter().cycle().skip(offset) {
+        let character_width = character.width().unwrap_or(0);
+        if used + character_width > width {
+            break;
+        }
+        output.push(*character);
+        used += character_width;
+        if used == width {
+            break;
+        }
+    }
+    output
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -315,7 +496,7 @@ pub async fn run(args: ServerArgs) -> io::Result<()> {
         root: Arc::new(root),
         token: token.map(Arc::new),
         hashes: HashCache::load(),
-        transfers: TransferHub::new(),
+        transfers: TransferHub::new(io::stderr().is_terminal()),
         idle_timeout: Duration::from_secs(args.idle_timeout),
     };
     let permits = Arc::new(Semaphore::new(args.max_connections.max(1)));
@@ -821,6 +1002,22 @@ fn format_bytes(bytes: u64) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn server_filename_field_is_fixed_width_and_scrolls() {
+        let path = "a-very-long-file-name-that-needs-scrolling.bin";
+        let initial = fit_server_filename(path, Some(Duration::ZERO));
+        let scrolled = fit_server_filename(path, Some(MARQUEE_PAUSE + MARQUEE_STEP));
+        assert_eq!(
+            UnicodeWidthStr::width(initial.as_str()),
+            SERVER_FILENAME_WIDTH
+        );
+        assert_eq!(
+            UnicodeWidthStr::width(scrolled.as_str()),
+            SERVER_FILENAME_WIDTH
+        );
+        assert_ne!(initial, scrolled);
+    }
 
     #[test]
     fn explicit_listener_address_is_reported() {

@@ -6,6 +6,7 @@ use crate::{
         DEFAULT_PORT, PROTOCOL_MAJOR, PROTOCOL_MINOR, SPACE_RESERVE, SYNC_INTERVAL,
     },
 };
+use chrono::{DateTime, Local};
 use clap::{ArgAction, Args as ClapArgs};
 use filetime::FileTime;
 use fs2::FileExt;
@@ -16,7 +17,7 @@ use std::{
     io::{self, IsTerminal, Read, Write},
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
-    time::{Duration, Instant},
+    time::{Duration, Instant, SystemTime},
 };
 use tokio::{
     fs,
@@ -84,6 +85,7 @@ pub struct Progress {
     pub resumed_from: u64,
     pub bytes_per_second: u64,
     pub eta: Option<Duration>,
+    pub completion_at: Option<SystemTime>,
     pub state: ProgressState,
     pub file_index: usize,
     pub file_count: usize,
@@ -425,6 +427,7 @@ pub(crate) async fn download_plan(
                             resumed_from: 0,
                             bytes_per_second: 0,
                             eta: None,
+                            completion_at: None,
                             state: ProgressState::Failed,
                             file_index,
                             file_count,
@@ -860,8 +863,15 @@ fn progress(
     rate: u64,
     state: ProgressState,
 ) -> Progress {
-    let eta = (rate > 0 && transferred < total)
-        .then(|| Duration::from_secs(total.saturating_sub(transferred) / rate));
+    let eta = (rate > 0 && transferred < total).then(|| {
+        Duration::from_secs(
+            total
+                .saturating_sub(transferred)
+                .saturating_add(rate.saturating_sub(1))
+                / rate,
+        )
+    });
+    let completion_at = eta.and_then(|duration| SystemTime::now().checked_add(duration));
     Progress {
         path: path.to_string(),
         transferred,
@@ -869,6 +879,7 @@ fn progress(
         resumed_from,
         bytes_per_second: rate,
         eta,
+        completion_at,
         state,
         file_index: 0,
         file_count: 0,
@@ -896,7 +907,7 @@ fn console_progress() -> ProgressCallback {
             0.0
         };
         let line = format!(
-            "[{}/{}] {} | {} / {} | {:5.1}% | {}/s | overall {} / {} | {:?}",
+            "[{}/{}] {} | {} / {} | {:5.1}% | {}/s | {} | overall {} / {} | {:?}",
             progress.file_index,
             progress.file_count,
             progress.path,
@@ -904,6 +915,7 @@ fn console_progress() -> ProgressCallback {
             format_bytes(progress.total),
             percent,
             format_bytes(progress.bytes_per_second),
+            format_completion_at(progress.completion_at),
             format_bytes(progress.batch_transferred),
             format_bytes(progress.batch_total),
             progress.state
@@ -915,6 +927,13 @@ fn console_progress() -> ProgressCallback {
             eprintln!("{line}");
         }
     })
+}
+
+pub(crate) fn format_completion_at(completion_at: Option<SystemTime>) -> String {
+    completion_at
+        .map(DateTime::<Local>::from)
+        .map(|timestamp| format!("ETA {}", timestamp.format("%H:%M:%S")))
+        .unwrap_or_else(|| "ETA --:--:--".to_string())
 }
 
 fn load_client_token(token_file: Option<&Path>) -> io::Result<Option<String>> {
@@ -1076,6 +1095,14 @@ mod tests {
             chunk_size: CHUNK_SIZE,
         };
         assert!(serde_json::to_vec(&metadata).unwrap().len() < 1024 * 1024);
+    }
+
+    #[test]
+    fn completion_eta_uses_a_local_clock_label() {
+        assert_eq!(format_completion_at(None), "ETA --:--:--");
+        let formatted = format_completion_at(Some(SystemTime::UNIX_EPOCH));
+        assert!(formatted.starts_with("ETA "));
+        assert!(formatted[4..].contains(':'));
     }
 
     #[tokio::test]

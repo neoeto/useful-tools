@@ -1,7 +1,7 @@
 use crate::{
     client::{
-        download_plan, expand_paths, format_bytes, preflight_collisions, Api, ClientArgs,
-        DownloadSummary, Progress, ProgressCallback, ProgressState,
+        download_plan, expand_paths, format_bytes, format_completion_at, preflight_collisions, Api,
+        ClientArgs, DownloadSummary, Progress, ProgressCallback, ProgressState,
     },
     pathing::safe_local_path,
     protocol::{ListEntry, SortBy},
@@ -564,14 +564,11 @@ fn draw_progress(frame: &mut Frame<'_>, area: Rect, app: &App) {
             } else {
                 progress.transferred as f64 / progress.total as f64
             };
-            let eta = progress
-                .eta
-                .map(|eta| format!(" · ETA {}s", eta.as_secs()))
-                .unwrap_or_default();
+            let eta = format_completion_at(progress.completion_at);
             (
                 ratio,
                 format!(
-                    "[{}/{}] {} · {} / {} · {}/s{} · overall {} / {} · {:?}",
+                    "[{}/{}] {} · {} / {} · {}/s · {} · overall {} / {} · {:?}",
                     progress.file_index,
                     progress.file_count,
                     progress.path,
