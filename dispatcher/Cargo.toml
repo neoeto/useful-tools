@@ -14,6 +14,7 @@ file-server = { path = "../file-server" }
 http-echo = { path = "../http-echo" }
 file-hash = { path = "../file-hash" }
 file-transfer = { path = "../file-transfer" }
+base64-tool = { path = "../base64-tool" }
 clap = { version = "4", features = ["derive"] }
 clap_complete = "4.6"
 dirs = "6"

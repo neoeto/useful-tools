@@ -1,0 +1,13 @@
+[package]
+name = "base64-tool"
+version = "0.1.0"
+edition = "2021"
+description = "Encode and decode Base64 data"
+
+[[bin]]
+name = "base64"
+path = "src/main.rs"
+
+[dependencies]
+base64 = "0.22"
+clap = { version = "4", features = ["derive"] }

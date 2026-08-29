@@ -917,6 +917,34 @@ fn tools() -> Vec<Tool> {
                     .for_mode("client"),
             ],
         },
+        Tool {
+            name: "base64",
+            description: "Encode and decode Base64 data",
+            fields: vec![
+                Field::positional_choice(
+                    "Mode",
+                    "encode or decode",
+                    &["encode", "decode"],
+                    "encode",
+                ),
+                Field::text("Input file", "file path or - for stdin", None, ""),
+                Field::text(
+                    "Text input",
+                    "literal text instead of a file",
+                    Some("--text"),
+                    "",
+                ),
+                Field::toggle("URL safe", "use the URL-safe alphabet", "--url-safe"),
+                Field::toggle("No padding", "omit or accept no = padding", "--no-padding"),
+                Field::text(
+                    "Wrap",
+                    "encoded line width; 0 disables",
+                    Some("--wrap"),
+                    "76",
+                )
+                .for_mode("encode"),
+            ],
+        },
     ]
 }
 
@@ -944,6 +972,17 @@ mod tests {
                 "one file.txt",
                 "two.txt"
             ]
+        );
+    }
+
+    #[test]
+    fn builds_base64_command_with_text_input() {
+        let mut tools = tools();
+        tools[5].fields[2].value = "hello world".to_string();
+        let args = tools[5].arguments().unwrap();
+        assert_eq!(
+            args,
+            ["base64", "encode", "--text", "hello world", "--wrap", "76"]
         );
     }
 

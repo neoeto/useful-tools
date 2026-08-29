@@ -35,6 +35,10 @@ enum Commands {
     /// Transfer files over TCP with resumable downloads
     #[command(name = "file-transfer")]
     FileTransfer(file_transfer::Args),
+
+    /// Encode and decode Base64 data
+    #[command(name = "base64")]
+    Base64(base64_tool::Args),
 }
 
 #[tokio::main]
@@ -56,6 +60,7 @@ async fn main() {
                 std::process::exit(1);
             }
         }
+        Some(Commands::Base64(args)) => std::process::exit(base64_tool::run(args)),
         None => {
             if let Err(error) = tui::run().await {
                 eprintln!("ut: failed to start TUI: {error}");

@@ -85,12 +85,25 @@ Modification times are restored. The Unix executable bit is restored on macOS/Li
 
 ```text
 ut uuid-gen
+ut base64 encode [FILE]
+ut base64 decode [FILE]
 ut file-server
 ut http-echo
 ut file-hash
 ```
 
 Run `ut <tool> --help` for each tool's options.
+
+Base64 reads a file (or standard input when no file is supplied) and writes the
+result to standard output. Literal text can be passed with `--text`; use
+`--url-safe` for the URL-safe alphabet and `--no-padding` to omit or accept
+unpadded data:
+
+```bash
+ut base64 encode --text "Hello, world!"
+printf 'Hello, world!' | ut base64 encode
+ut base64 decode encoded.txt > decoded.bin
+```
 
 ## Shell tab completion
 
