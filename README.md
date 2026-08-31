@@ -89,10 +89,25 @@ ut base64 encode [FILE]
 ut base64 decode [FILE]
 ut file-server
 ut http-echo
+ut network-server
 ut file-hash
 ```
 
 Run `ut <tool> --help` for each tool's options.
+
+The network server is useful for quickly testing clients that use more than
+ordinary HTTP:
+
+```bash
+ut network-server
+curl http://127.0.0.1:8090/healthz
+curl -N http://127.0.0.1:8090/sse
+```
+
+It serves a browser smoke-test page at `/`, an SSE stream at `/sse`, a
+WebSocket echo endpoint at `/ws`, and request-inspection JSON for all other
+paths. SSE can be configured with `--sse-interval` (milliseconds),
+`--sse-count` (`0` keeps the stream open), and `--sse-message`.
 
 Base64 reads a file (or standard input when no file is supplied) and writes the
 result to standard output. Literal text can be passed with `--text`; use

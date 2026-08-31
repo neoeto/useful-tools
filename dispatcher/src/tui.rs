@@ -866,6 +866,27 @@ fn tools() -> Vec<Tool> {
             ],
         },
         Tool {
+            name: "network-server",
+            description: "Test HTTP, SSE, and WebSocket clients",
+            fields: vec![
+                Field::text("Port", "listen port", Some("--port"), "8090"),
+                Field::text("Host", "bind address", Some("--host"), "0.0.0.0"),
+                Field::text(
+                    "SSE interval",
+                    "milliseconds",
+                    Some("--sse-interval"),
+                    "1000",
+                ),
+                Field::text("SSE count", "0 means endless", Some("--sse-count"), "0"),
+                Field::text(
+                    "SSE message",
+                    "event message prefix",
+                    Some("--sse-message"),
+                    "network-server event",
+                ),
+            ],
+        },
+        Tool {
             name: "file-hash",
             description: "Hash files or verify checksums",
             fields: vec![
@@ -961,8 +982,8 @@ mod tests {
     #[test]
     fn parses_quoted_positional_paths() {
         let mut tools = tools();
-        tools[3].fields[1].value = "'one file.txt' two.txt".to_string();
-        let args = tools[3].arguments().unwrap();
+        tools[4].fields[1].value = "'one file.txt' two.txt".to_string();
+        let args = tools[4].arguments().unwrap();
         assert_eq!(
             args,
             [
@@ -978,8 +999,8 @@ mod tests {
     #[test]
     fn builds_base64_command_with_text_input() {
         let mut tools = tools();
-        tools[5].fields[2].value = "hello world".to_string();
-        let args = tools[5].arguments().unwrap();
+        tools[6].fields[2].value = "hello world".to_string();
+        let args = tools[6].arguments().unwrap();
         assert_eq!(
             args,
             ["base64", "encode", "--text", "hello world", "--wrap", "76"]

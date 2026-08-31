@@ -12,6 +12,7 @@ path = "src/main.rs"
 uuid-gen = { path = "../uuid-gen" }
 file-server = { path = "../file-server" }
 http-echo = { path = "../http-echo" }
+network-server = { path = "../network-server" }
 file-hash = { path = "../file-hash" }
 file-transfer = { path = "../file-transfer" }
 base64-tool = { path = "../base64-tool" }

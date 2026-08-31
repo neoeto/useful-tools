@@ -1,0 +1,15 @@
+[package]
+name = "network-server"
+version = "0.1.0"
+edition = "2021"
+description = "A local HTTP, SSE, and WebSocket test server"
+
+[dependencies]
+axum = { version = "0.8", features = ["ws"] }
+clap = { version = "4", features = ["derive"] }
+futures-util = "0.3"
+serde = { version = "1", features = ["derive"] }
+tokio = { version = "1", features = ["full"] }
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }

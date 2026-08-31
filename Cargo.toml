@@ -4,6 +4,7 @@ members = [
     "uuid-gen",
     "dispatcher",
     "http-echo",
+    "network-server",
     "file-hash",
     "file-transfer",
     "base64-tool",
