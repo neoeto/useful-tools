@@ -91,6 +91,7 @@ ut file-server
 ut http-echo
 ut network-server
 ut file-hash
+ut clipboard [FILE]
 ```
 
 Run `ut <tool> --help` for each tool's options.
@@ -119,6 +120,20 @@ ut base64 encode --text "Hello, world!"
 printf 'Hello, world!' | ut base64 encode
 ut base64 decode encoded.txt > decoded.bin
 ```
+
+Clipboard reads a file, or standard input when the file is omitted or `-`, and
+copies the content to the system clipboard. It prints a success summary with
+the source, size, and clipboard backend:
+
+```bash
+ut clipboard README.md
+cat README.md | ut clipboard
+ut file-hash --algorithm sha256 README.md | ut clipboard -
+```
+
+On Linux, `ut clipboard` uses the first available backend in this order:
+`wl-copy`, `xclip`, then `xsel`. Install `wl-clipboard`, `xclip`, or `xsel` if
+none of them is available. macOS uses `pbcopy`, and Windows uses `clip`.
 
 ## Shell tab completion
 

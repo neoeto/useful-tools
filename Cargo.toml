@@ -8,5 +8,6 @@ members = [
     "file-hash",
     "file-transfer",
     "base64-tool",
+    "clipboard-tool",
 ]
 resolver = "2"

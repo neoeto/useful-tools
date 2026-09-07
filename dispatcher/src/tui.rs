@@ -966,6 +966,16 @@ fn tools() -> Vec<Tool> {
                 .for_mode("encode"),
             ],
         },
+        Tool {
+            name: "clipboard",
+            description: "Copy a file or stdin to the system clipboard",
+            fields: vec![Field::text(
+                "Input file",
+                "file path or - for stdin; empty uses stdin",
+                None,
+                "",
+            )],
+        },
     ]
 }
 
@@ -1005,6 +1015,14 @@ mod tests {
             args,
             ["base64", "encode", "--text", "hello world", "--wrap", "76"]
         );
+    }
+
+    #[test]
+    fn builds_clipboard_command_with_file_input() {
+        let mut tools = tools();
+        tools[7].fields[0].value = "notes.txt".to_string();
+        let args = tools[7].arguments().unwrap();
+        assert_eq!(args, ["clipboard", "notes.txt"]);
     }
 
     #[test]

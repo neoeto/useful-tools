@@ -1,0 +1,12 @@
+[package]
+name = "clipboard-tool"
+version = "0.1.0"
+edition = "2021"
+description = "Copy file or standard input contents to the system clipboard"
+
+[[bin]]
+name = "clipboard"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }

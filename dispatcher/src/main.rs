@@ -43,6 +43,10 @@ enum Commands {
     /// Encode and decode Base64 data
     #[command(name = "base64")]
     Base64(base64_tool::Args),
+
+    /// Copy file contents or standard input to the system clipboard
+    #[command(name = "clipboard")]
+    Clipboard(clipboard_tool::Args),
 }
 
 #[tokio::main]
@@ -66,6 +70,7 @@ async fn main() {
             }
         }
         Some(Commands::Base64(args)) => std::process::exit(base64_tool::run(args)),
+        Some(Commands::Clipboard(args)) => std::process::exit(clipboard_tool::run(args)),
         None => {
             if let Err(error) = tui::run().await {
                 eprintln!("ut: failed to start TUI: {error}");
