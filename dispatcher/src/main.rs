@@ -36,6 +36,10 @@ enum Commands {
     #[command(name = "file-hash")]
     FileHash(file_hash::Args),
 
+    /// Generate files with a requested size
+    #[command(name = "file-gen")]
+    FileGen(file_gen::Args),
+
     /// Transfer files over TCP with resumable downloads
     #[command(name = "file-transfer")]
     FileTransfer(file_transfer::Args),
@@ -63,6 +67,7 @@ async fn main() {
         Some(Commands::HttpEcho(args)) => http_echo::run(args).await,
         Some(Commands::NetworkServer(args)) => network_server::run(args).await,
         Some(Commands::FileHash(args)) => std::process::exit(file_hash::run(args)),
+        Some(Commands::FileGen(args)) => std::process::exit(file_gen::run(args)),
         Some(Commands::FileTransfer(args)) => {
             if let Err(error) = file_transfer::run(args).await {
                 eprintln!("file-transfer: {error}");

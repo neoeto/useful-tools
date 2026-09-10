@@ -904,6 +904,16 @@ fn tools() -> Vec<Tool> {
             ],
         },
         Tool {
+            name: "file-gen",
+            description: "Generate a file with a requested size",
+            fields: vec![
+                Field::text("Output", "generated file path", None, "output.bin"),
+                Field::text("Size", "for example 10MiB", None, "1MiB"),
+                Field::toggle("Random", "fill with random bytes", "--random"),
+                Field::toggle("Force", "replace an existing file", "--force"),
+            ],
+        },
+        Tool {
             name: "file-transfer",
             description: "Browse and transfer files over TCP",
             fields: vec![
@@ -1009,8 +1019,8 @@ mod tests {
     #[test]
     fn builds_base64_command_with_text_input() {
         let mut tools = tools();
-        tools[6].fields[2].value = "hello world".to_string();
-        let args = tools[6].arguments().unwrap();
+        tools[7].fields[2].value = "hello world".to_string();
+        let args = tools[7].arguments().unwrap();
         assert_eq!(
             args,
             ["base64", "encode", "--text", "hello world", "--wrap", "76"]
@@ -1020,9 +1030,19 @@ mod tests {
     #[test]
     fn builds_clipboard_command_with_file_input() {
         let mut tools = tools();
-        tools[7].fields[0].value = "notes.txt".to_string();
-        let args = tools[7].arguments().unwrap();
+        tools[8].fields[0].value = "notes.txt".to_string();
+        let args = tools[8].arguments().unwrap();
         assert_eq!(args, ["clipboard", "notes.txt"]);
+    }
+
+    #[test]
+    fn builds_file_gen_command() {
+        let mut tools = tools();
+        tools[5].fields[0].value = "fixture.bin".to_string();
+        tools[5].fields[1].value = "10MiB".to_string();
+        tools[5].fields[2].value = "true".to_string();
+        let args = tools[5].arguments().unwrap();
+        assert_eq!(args, ["file-gen", "fixture.bin", "10MiB", "--random"]);
     }
 
     #[test]

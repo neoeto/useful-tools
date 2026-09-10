@@ -91,6 +91,7 @@ ut file-server
 ut http-echo
 ut network-server
 ut file-hash
+ut file-gen <PATH> <SIZE>
 ut clipboard [FILE]
 ```
 
@@ -104,6 +105,20 @@ ut network-server
 curl http://127.0.0.1:8090/healthz
 curl -N http://127.0.0.1:8090/sse
 ```
+
+Generate a file of an exact logical size for upload, transfer, or disk tests:
+
+```bash
+ut file-gen fixture.bin 10MiB
+ut file-gen random.bin 1GB --random
+ut file-gen fixture.bin 1000000 --force
+```
+
+Sizes accept bytes with no unit, decimal `KB`/`MB`/`GB`/`TB`, and binary
+`KiB`/`MiB`/`GiB`/`TiB` units. Files are zero-filled by default and are written
+in full rather than created as sparse files. Use `--random` for random bytes.
+Existing files are protected unless `--force` is supplied; replacement happens
+only after the new file is completely written.
 
 It serves a browser smoke-test page at `/`, an SSE stream at `/sse`, a
 WebSocket echo endpoint at `/ws`, and request-inspection JSON for all other

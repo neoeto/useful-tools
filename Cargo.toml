@@ -6,6 +6,7 @@ members = [
     "http-echo",
     "network-server",
     "file-hash",
+    "file-gen",
     "file-transfer",
     "base64-tool",
     "clipboard-tool",
