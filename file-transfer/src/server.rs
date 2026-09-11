@@ -1,11 +1,11 @@
 use crate::{
+    client::format_eta,
     pathing::resolve_server_path,
     protocol::{
         self, error_message, ClientMessage, FileInfo, ListEntry, ServerMessage, SortBy, CHUNK_SIZE,
         PROTOCOL_MAJOR, PROTOCOL_MINOR,
     },
 };
-use chrono::{DateTime, Local};
 use clap::Args as ClapArgs;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -16,7 +16,7 @@ use std::{
     net::{IpAddr, SocketAddr, UdpSocket},
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
-    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
+    time::{Duration, Instant, UNIX_EPOCH},
 };
 use tokio::{
     fs,
@@ -257,7 +257,7 @@ fn render_dashboard(states: &[(Uuid, TransferStatus)], previous_lines: usize) ->
                     format_bytes(state.sent),
                     format_bytes(state.total),
                     format_bytes(rate as u64),
-                    format_completion_time(estimate_completion(state, elapsed)),
+                    format_eta(estimate_remaining(state, elapsed)),
                 );
             }
         }
@@ -271,7 +271,7 @@ fn render_dashboard(states: &[(Uuid, TransferStatus)], previous_lines: usize) ->
     }
 }
 
-fn estimate_completion(state: &TransferStatus, elapsed: Duration) -> Option<SystemTime> {
+fn estimate_remaining(state: &TransferStatus, elapsed: Duration) -> Option<Duration> {
     let transferred = state.sent.saturating_sub(state.offset);
     let remaining = state.total.saturating_sub(state.sent);
     if state.result.is_some() || transferred == 0 || remaining == 0 {
@@ -286,14 +286,7 @@ fn estimate_completion(state: &TransferStatus, elapsed: Duration) -> Option<Syst
         return None;
     }
     let remaining_seconds = remaining.saturating_add(rate.saturating_sub(1)) / rate;
-    SystemTime::now().checked_add(Duration::from_secs(remaining_seconds))
-}
-
-fn format_completion_time(completion_at: Option<SystemTime>) -> String {
-    completion_at
-        .map(DateTime::<Local>::from)
-        .map(|timestamp| format!("ETA {}", timestamp.format("%H:%M:%S")))
-        .unwrap_or_else(|| "ETA --:--:--".to_string())
+    Some(Duration::from_secs(remaining_seconds))
 }
 
 fn fit_server_filename(path: &str, elapsed: Option<Duration>) -> String {

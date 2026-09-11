@@ -1,6 +1,6 @@
 use crate::{
     client::{
-        download_plan, expand_paths, format_bytes, format_completion_at, preflight_collisions, Api,
+        download_plan, expand_paths, format_bytes, format_eta, preflight_collisions, Api,
         ClientArgs, DownloadSummary, Progress, ProgressCallback, ProgressState,
     },
     pathing::safe_local_path,
@@ -564,7 +564,7 @@ fn draw_progress(frame: &mut Frame<'_>, area: Rect, app: &App) {
             } else {
                 progress.transferred as f64 / progress.total as f64
             };
-            let eta = format_completion_at(progress.completion_at);
+            let eta = format_eta(progress.eta);
             (
                 ratio,
                 format!(

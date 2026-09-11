@@ -6,7 +6,6 @@ use crate::{
         DEFAULT_PORT, PROTOCOL_MAJOR, PROTOCOL_MINOR, SPACE_RESERVE, SYNC_INTERVAL,
     },
 };
-use chrono::{DateTime, Local};
 use clap::{ArgAction, Args as ClapArgs};
 use filetime::FileTime;
 use fs2::FileExt;
@@ -17,7 +16,7 @@ use std::{
     io::{self, IsTerminal, Read, Write},
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
-    time::{Duration, Instant, SystemTime},
+    time::{Duration, Instant},
 };
 use tokio::{
     fs,
@@ -85,7 +84,6 @@ pub struct Progress {
     pub resumed_from: u64,
     pub bytes_per_second: u64,
     pub eta: Option<Duration>,
-    pub completion_at: Option<SystemTime>,
     pub state: ProgressState,
     pub file_index: usize,
     pub file_count: usize,
@@ -427,7 +425,6 @@ pub(crate) async fn download_plan(
                             resumed_from: 0,
                             bytes_per_second: 0,
                             eta: None,
-                            completion_at: None,
                             state: ProgressState::Failed,
                             file_index,
                             file_count,
@@ -871,7 +868,6 @@ fn progress(
                 / rate,
         )
     });
-    let completion_at = eta.and_then(|duration| SystemTime::now().checked_add(duration));
     Progress {
         path: path.to_string(),
         transferred,
@@ -879,7 +875,6 @@ fn progress(
         resumed_from,
         bytes_per_second: rate,
         eta,
-        completion_at,
         state,
         file_index: 0,
         file_count: 0,
@@ -915,7 +910,7 @@ fn console_progress() -> ProgressCallback {
             format_bytes(progress.total),
             percent,
             format_bytes(progress.bytes_per_second),
-            format_completion_at(progress.completion_at),
+            format_eta(progress.eta),
             format_bytes(progress.batch_transferred),
             format_bytes(progress.batch_total),
             progress.state
@@ -929,11 +924,23 @@ fn console_progress() -> ProgressCallback {
     })
 }
 
-pub(crate) fn format_completion_at(completion_at: Option<SystemTime>) -> String {
-    completion_at
-        .map(DateTime::<Local>::from)
-        .map(|timestamp| format!("ETA {}", timestamp.format("%H:%M:%S")))
-        .unwrap_or_else(|| "ETA --:--:--".to_string())
+pub(crate) fn format_eta(eta: Option<Duration>) -> String {
+    let Some(eta) = eta else {
+        return "ETA --".to_string();
+    };
+    let seconds = eta.as_secs();
+    if seconds > 60 * 60 {
+        format!(
+            "ETA {}H{}M{}S",
+            seconds / (60 * 60),
+            seconds / 60 % 60,
+            seconds % 60
+        )
+    } else if seconds > 60 {
+        format!("ETA {}M{}S", seconds / 60, seconds % 60)
+    } else {
+        format!("ETA {seconds}S")
+    }
 }
 
 fn load_client_token(token_file: Option<&Path>) -> io::Result<Option<String>> {
@@ -1098,11 +1105,11 @@ mod tests {
     }
 
     #[test]
-    fn completion_eta_uses_a_local_clock_label() {
-        assert_eq!(format_completion_at(None), "ETA --:--:--");
-        let formatted = format_completion_at(Some(SystemTime::UNIX_EPOCH));
-        assert!(formatted.starts_with("ETA "));
-        assert!(formatted[4..].contains(':'));
+    fn completion_eta_uses_remaining_duration_units() {
+        assert_eq!(format_eta(None), "ETA --");
+        assert_eq!(format_eta(Some(Duration::from_secs(60))), "ETA 60S");
+        assert_eq!(format_eta(Some(Duration::from_secs(61))), "ETA 1M1S");
+        assert_eq!(format_eta(Some(Duration::from_secs(3_601))), "ETA 1H0M1S");
     }
 
     #[tokio::test]

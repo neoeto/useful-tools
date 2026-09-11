@@ -33,7 +33,7 @@ ut file-transfer client server.example.com \
 
 The default Server port is `9417`. Both Server sharing and Client downloads default to the current directory.
 
-When the Server runs in a terminal, each active download occupies one status row that is refreshed once per second. The remote path column is fixed-width; long names scroll within it, and active rows include an absolute local-clock ETA. Completed rows briefly show their final result and then disappear; redirected or non-interactive logs emit one final line per download instead of repeating progress lines. Client progress output also includes the estimated completion time.
+When the Server runs in a terminal, each active download occupies one status row that is refreshed once per second. The remote path column is fixed-width; long names scroll within it, and active rows include a remaining-time ETA (for example, `1H2M3S`, `2M3S`, or `45S`). Completed rows briefly show their final result and then disappear; redirected or non-interactive logs emit one final line per download instead of repeating progress lines. Client progress output also includes the estimated completion time.
 
 ### Optional authentication
 
